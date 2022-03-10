@@ -2,7 +2,7 @@
 #define MAIN_LOOP_PERIOD	5000
 
 
-void init(const cJSON *cfg)
+void init(const JsonObject cfg)
 {
 	ESP_LOGI(TAG, "init");
 }
