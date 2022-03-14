@@ -18,13 +18,13 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <nvs_flash.h>
-#include <cJSON.h>
+#include <ArduinoJson.h>
 #include <esp_http_client.h>
 #include <esp_ota_ops.h>
 
 static const char* TAG = "app";
 
-void init(const cJSON *cfg);
+void init(const JsonObject cfg);
 void start();
 void loop();
 
@@ -81,18 +81,15 @@ static void main_init()
 	const esp_partition_t *cfgPart = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "cfg");
 	const char *cfgData; spi_flash_mmap_handle_t cfgDataHandle;
 	ESP_ERROR_CHECK(esp_partition_mmap(cfgPart, 0, cfgPart->size, SPI_FLASH_MMAP_DATA, (const void**) &cfgData, &cfgDataHandle));
-	cJSON *cfg = cJSON_Parse(cfgData);
+	StaticJsonDocument<512> cfg; 
+	deserializeJson(cfg, cfgData);
 	
 	//### wifi config
-	const cJSON *cfgWifi = cJSON_GetObjectItem(cfg, "wifi");
-	const cJSON *cfgWifiPsk   = cJSON_GetObjectItem(cfgWifi, "psk");
-	const cJSON *cfgWifiBssid = cJSON_GetObjectItem(cfgWifi, "bssid");
 	wifi_config_t wifiConfig = {};
-	strncpy((char*) wifiConfig.sta.password, cfgWifiPsk->valuestring, sizeof(wifiConfig.sta.password));
-	const cJSON *bssidByte = NULL; int i = 0; 
-	cJSON_ArrayForEach(bssidByte, cfgWifiBssid) {
-		wifiConfig.sta.bssid[i++] = bssidByte->valueint;
-	}
+	JsonObject cfgWifi = cfg["wifi"]; JsonArray cfgWifiBssid = cfgWifi["bssid"];
+	strncpy((char*) wifiConfig.sta.password, cfgWifi["psk"], sizeof(wifiConfig.sta.password));
+	for (int i=0; i<6; ++i)
+		wifiConfig.sta.bssid[i] = cfgWifiBssid[i];
 	
 	//### wifi start
 	StaticSemaphore_t wifiConnectedSemaphoreBuffer; SemaphoreHandle_t wifiConnectedSemaphore = xSemaphoreCreateBinaryStatic(&wifiConnectedSemaphoreBuffer);
@@ -120,7 +117,7 @@ static void main_init()
 	
 	//### app init
 	ESP_LOGI(TAG, "app init");
-	init(cfg);
+	init(cfg.as<JsonObject>());
 	
 	//### wait wifi connected
 	xSemaphoreTake(wifiConnectedSemaphore, portMAX_DELAY);
@@ -128,7 +125,7 @@ static void main_init()
 	//### ota connect
 	char otaBuffer[65];
 	esp_http_client_config_t otaClientConfig = {};
-	otaClientConfig.url = cJSON_GetObjectItem(cfg, "ota")->valuestring;
+	otaClientConfig.url = cfg["ota"];
 	esp_http_client_handle_t otaClient = esp_http_client_init(&otaClientConfig);
 	esp_ota_get_app_elf_sha256(otaBuffer, sizeof(otaBuffer));
 	ESP_ERROR_CHECK(esp_http_client_set_header(otaClient, "Hash", otaBuffer));
@@ -139,7 +136,6 @@ static void main_init()
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_handler_instance_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,     wifiConnectHandler));
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_handler_instance_unregister(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, wifiConnectedHandler));
 	vSemaphoreDelete(wifiConnectedSemaphore);
-	cJSON_Delete(cfg);
 	spi_flash_munmap(cfgDataHandle);
 	
 	//### ota finish
