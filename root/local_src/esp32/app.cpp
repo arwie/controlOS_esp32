@@ -173,7 +173,7 @@ extern "C" void app_main(void)
 	ESP_LOGI(TAG, "app loop");
 	for (TickType_t xLastWakeTime = xTaskGetTickCount();;) {
 		loop();
-		vTaskDelayUntil(&xLastWakeTime, MAIN_LOOP_PERIOD/portTICK_PERIOD_MS);
+		vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(MAIN_LOOP_PERIOD));
 	}
 #endif
 }
