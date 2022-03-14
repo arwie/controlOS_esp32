@@ -15,30 +15,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-class UdpSender
+#include <esp_adc_cal.h>
+
+
+class ADC
 {
 public:
-	void init(const char* receiverAddr, const int receiverPort)
+	void init()
 	{
-		addr.sin_addr.s_addr = inet_addr(receiverAddr);
-		addr.sin_port = htons(receiverPort);
-		addr.sin_family = AF_INET;
-		
-		sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-		if (sock < 0)
-			ESP_LOGE(TAG, "UdpSender:init > errno %d", errno);
+		ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11));	//GPIO34
+		ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11));	//GPIO36
+		ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CHANNEL_3, ADC_ATTEN_DB_11));	//GPIO39
+		ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
+		esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc1_chars);
 	}
 	
-	void send(const JsonDocument& data)
-	{
-		char msg[512];
-		auto msgLen = serializeJson(data, msg, sizeof(msg));
-		ESP_LOGI(TAG, "UdpSender:sending > %s", msg);
-		if (sendto(sock, msg, msgLen, 0, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-			ESP_LOGE(TAG, "UdpSender:send > errno %d", errno);
+	int voltage(int channel, int samples=10) {
+		int voltage = 0;
+		for (int s=0; s<samples; ++s) {
+			uint32_t v;
+			ESP_ERROR_CHECK_WITHOUT_ABORT(esp_adc_cal_get_voltage((adc_channel_t)channel, &adc1_chars, &v));
+			voltage += v;
+		}
+		return voltage / samples;
 	}
 	
 private:
-	struct sockaddr_in addr;
-	int sock;
+	esp_adc_cal_characteristics_t adc1_chars;
 };
