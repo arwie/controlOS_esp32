@@ -1,5 +1,5 @@
-#define MAIN_NET_IP			"192.168.173.81"
-#define MAIN_LOOP_PERIOD	5000
+#define APP_NET_IP			"192.168.173.81"
+#define APP_LOOP_PERIOD		1000
 
 
 void init(const JsonObject cfg)

@@ -14,34 +14,10 @@
 // WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef ANALOG_H_
-#define ANALOG_H_
+
+#include <functional>
 
 
-#include <esp_adc_cal.h>
-
-
-static esp_adc_cal_characteristics_t analog_characteristics;
-
-
-int analog_voltage(int channel, int samples=10)
-{
-	uint32_t raw = 0;
-	for (int s=0; s<samples; ++s)
-		raw += adc1_get_raw((adc1_channel_t)channel);
-	raw /= samples;
-	return esp_adc_cal_raw_to_voltage(raw, &analog_characteristics);
+template<typename T> int sgn(T val) {
+	return (T(0) < val) - (val < T(0));
 }
-
-
-void analog_init()
-{
-	for (int ch=0; ch<8; ++ch)
-		ESP_ERROR_CHECK(adc1_config_channel_atten((adc1_channel_t)ch, ADC_ATTEN_DB_11));
-	ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
-	esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &analog_characteristics);
-}
-#define APP_ANALOG_INIT		analog_init()
-
-
-#endif //ANALOG_H_

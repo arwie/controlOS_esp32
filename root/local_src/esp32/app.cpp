@@ -17,16 +17,23 @@
 
 #include <esp_log.h>
 #include <esp_wifi.h>
-#include <nvs_flash.h>
 #include <ArduinoJson.h>
 #include <esp_http_client.h>
 #include <esp_ota_ops.h>
 
+#include "util.h"
+
+using namespace std;
+
 static const char* TAG = "app";
 
-void init(const JsonObject cfg);
-void start();
-void loop();
+
+int8_t wifi_signal() {
+	wifi_ap_record_t ap = {};
+	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_sta_get_ap_info(&ap));
+	return ap.rssi;
+}
+
 
 #include <app.hpp>
 
@@ -81,7 +88,7 @@ static void main_init()
 	const esp_partition_t *cfgPart = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "cfg");
 	const char *cfgData; spi_flash_mmap_handle_t cfgDataHandle;
 	ESP_ERROR_CHECK(esp_partition_mmap(cfgPart, 0, cfgPart->size, SPI_FLASH_MMAP_DATA, (const void**) &cfgData, &cfgDataHandle));
-	StaticJsonDocument<512> cfg; 
+	DynamicJsonDocument cfg(1024);
 	deserializeJson(cfg, cfgData);
 	
 	//### wifi config
@@ -101,19 +108,25 @@ static void main_init()
 	ESP_ERROR_CHECK(esp_wifi_start());
 	
 	//### static ip
+	#ifndef APP_NET_IP
+		#define APP_NET_IP cfg["net"]["ip"]
+	#endif
 	esp_netif_ip_info_t ipInfo = {};
 	IP4_ADDR(&ipInfo.netmask, 255, 255, 255, 0);
-	ipInfo.ip.addr = ipaddr_addr(MAIN_NET_IP);
+	ipInfo.ip.addr = ipaddr_addr(APP_NET_IP);
 	ESP_ERROR_CHECK(esp_netif_dhcpc_stop(wifiSta));
 	ESP_ERROR_CHECK(esp_netif_set_ip_info(wifiSta, &ipInfo));
 	
-	//### init nvs
-	esp_err_t nvsErr = nvs_flash_init();
-	if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-		//ESP_ERROR_CHECK(nvs_flash_erase());
-		//nvsErr = nvs_flash_init();
-	}
-	ESP_ERROR_CHECK(nvsErr);
+	//### init plugins
+	#ifdef APP_NVS_INIT
+		APP_NVS_INIT;
+	#endif
+	#ifdef APP_SERIAL_INIT
+		APP_SERIAL_INIT;
+	#endif
+	#ifdef APP_ANALOG_INIT
+		APP_ANALOG_INIT;
+	#endif
 	
 	//### app init
 	ESP_LOGI(TAG, "app init");
@@ -123,7 +136,7 @@ static void main_init()
 	xSemaphoreTake(wifiConnectedSemaphore, portMAX_DELAY);
 	
 	//### ota connect
-	char otaBuffer[65];
+	char otaBuffer[128];
 	esp_http_client_config_t otaClientConfig = {};
 	otaClientConfig.url = cfg["ota"];
 	esp_http_client_handle_t otaClient = esp_http_client_init(&otaClientConfig);
@@ -165,11 +178,17 @@ extern "C" void app_main(void)
 	ESP_LOGI(TAG, "app start");
 	start();
 	
-#ifdef MAIN_LOOP_PERIOD
 	ESP_LOGI(TAG, "app loop");
+	esp_log_level_set(TAG, ESP_LOG_WARN);
+	
 	for (TickType_t xLastWakeTime = xTaskGetTickCount();;) {
 		loop();
-		vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(MAIN_LOOP_PERIOD));
+		
+		//### loop plugins
+		#ifdef APP_SERIAL_LOOP
+			APP_SERIAL_LOOP;
+		#endif
+		
+		vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(APP_LOOP_PERIOD));
 	}
-#endif
 }

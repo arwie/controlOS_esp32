@@ -14,34 +14,38 @@
 // WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef ANALOG_H_
-#define ANALOG_H_
+
+#include <nvs_flash.h>
 
 
-#include <esp_adc_cal.h>
-
-
-static esp_adc_cal_characteristics_t analog_characteristics;
-
-
-int analog_voltage(int channel, int samples=10)
+class NVS
 {
-	uint32_t raw = 0;
-	for (int s=0; s<samples; ++s)
-		raw += adc1_get_raw((adc1_channel_t)channel);
-	raw /= samples;
-	return esp_adc_cal_raw_to_voltage(raw, &analog_characteristics);
-}
+public:
+	NVS()
+	{
+		ESP_ERROR_CHECK(nvs_open("app", NVS_READWRITE, &handle));
+	}
+	
+	operator nvs_handle_t() { return handle; }
+	
+	~NVS()
+	{
+		ESP_ERROR_CHECK(nvs_commit(handle));
+		nvs_close(handle);
+	}
+	
+private:
+	nvs_handle_t handle;
+};
 
 
-void analog_init()
+void nvs_init()
 {
-	for (int ch=0; ch<8; ++ch)
-		ESP_ERROR_CHECK(adc1_config_channel_atten((adc1_channel_t)ch, ADC_ATTEN_DB_11));
-	ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
-	esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &analog_characteristics);
+	esp_err_t nvsErr = nvs_flash_init();
+	if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		nvsErr = nvs_flash_init();
+	}
+	ESP_ERROR_CHECK(nvsErr);
 }
-#define APP_ANALOG_INIT		analog_init()
-
-
-#endif //ANALOG_H_
+#define APP_NVS_INIT	nvs_init()

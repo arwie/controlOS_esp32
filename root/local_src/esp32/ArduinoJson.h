@@ -214,10 +214,10 @@
 #define ARDUINOJSON_HEX_DIGIT_1111() F
 #define ARDUINOJSON_HEX_DIGIT_(A, B, C, D) ARDUINOJSON_HEX_DIGIT_##A##B##C##D()
 #define ARDUINOJSON_HEX_DIGIT(A, B, C, D) ARDUINOJSON_HEX_DIGIT_(A, B, C, D)
-#define ARDUINOJSON_VERSION "6.19.3"
+#define ARDUINOJSON_VERSION "6.19.4"
 #define ARDUINOJSON_VERSION_MAJOR 6
 #define ARDUINOJSON_VERSION_MINOR 19
-#define ARDUINOJSON_VERSION_REVISION 3
+#define ARDUINOJSON_VERSION_REVISION 4
 #ifndef ARDUINOJSON_NAMESPACE
 #  define ARDUINOJSON_NAMESPACE                                               \
     ARDUINOJSON_CONCAT4(                                                      \
@@ -3108,6 +3108,9 @@ class ElementProxy : public VariantOperators<ElementProxy<TArray> >,
   FORCE_INLINE size_t size() const {
     return getUpstreamElement().size();
   }
+  FORCE_INLINE size_t memoryUsage() const {
+    return getUpstreamElement().memoryUsage();
+  }
   template <typename TNestedKey>
   VariantRef getMember(TNestedKey* key) const {
     return getUpstreamElement().getMember(key);
@@ -3226,6 +3229,9 @@ class MemberProxy : public VariantOperators<MemberProxy<TObject, TStringRef> >,
   FORCE_INLINE size_t size() const {
     return getUpstreamMember().size();
   }
+  FORCE_INLINE size_t memoryUsage() const {
+    return getUpstreamMember().memoryUsage();
+  }
   FORCE_INLINE void remove(size_t index) const {
     getUpstreamMember().remove(index);
   }
@@ -3298,7 +3304,8 @@ class MemberProxy : public VariantOperators<MemberProxy<TObject, TStringRef> >,
 #  pragma warning(pop)
 #endif
 namespace ARDUINOJSON_NAMESPACE {
-class JsonDocument : public Visitable {
+class JsonDocument : public Visitable,
+                     public VariantOperators<const JsonDocument&> {
  public:
   template <typename TVisitor>
   typename TVisitor::result_type accept(TVisitor& visitor) const {
@@ -3485,14 +3492,11 @@ class JsonDocument : public Visitable {
       const TString& key) {
     _data.remove(adaptString(key));
   }
+  FORCE_INLINE operator VariantRef() {
+    return getVariant();
+  }
   FORCE_INLINE operator VariantConstRef() const {
-    return VariantConstRef(&_data);
-  }
-  bool operator==(VariantConstRef rhs) const {
-    return getVariant() == rhs;
-  }
-  bool operator!=(VariantConstRef rhs) const {
-    return getVariant() != rhs;
+    return getVariant();
   }
  protected:
   JsonDocument() : _pool(0, 0) {
@@ -5115,8 +5119,8 @@ struct RawComparer : ComparerBase {
 template <typename T>
 struct Comparer<T, typename enable_if<IsVisitable<T>::value>::type>
     : ComparerBase {
-  T rhs;
-  explicit Comparer(T value) : rhs(value) {}
+  const T *rhs;  // TODO: should be a VariantConstRef
+  explicit Comparer(const T &value) : rhs(&value) {}
   CompareResult visitArray(const CollectionData &lhs) {
     ArrayComparer comparer(lhs);
     return accept(comparer);
@@ -5156,7 +5160,7 @@ struct Comparer<T, typename enable_if<IsVisitable<T>::value>::type>
  private:
   template <typename TComparer>
   CompareResult accept(TComparer &comparer) {
-    CompareResult reversedResult = rhs.accept(comparer);
+    CompareResult reversedResult = rhs->accept(comparer);
     switch (reversedResult) {
       case COMPARE_RESULT_GREATER:
         return COMPARE_RESULT_LESS;

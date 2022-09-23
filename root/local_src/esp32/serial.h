@@ -14,34 +14,34 @@
 // WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef ANALOG_H_
-#define ANALOG_H_
+
+#include <driver/uart.h>
+#include <esp_vfs_dev.h>
 
 
-#include <esp_adc_cal.h>
+void serial_receive(char cmd);
 
-
-static esp_adc_cal_characteristics_t analog_characteristics;
-
-
-int analog_voltage(int channel, int samples=10)
+void serial_loop()
 {
-	uint32_t raw = 0;
-	for (int s=0; s<samples; ++s)
-		raw += adc1_get_raw((adc1_channel_t)channel);
-	raw /= samples;
-	return esp_adc_cal_raw_to_voltage(raw, &analog_characteristics);
+	char cmd;
+	if (uart_read_bytes(UART_NUM_0, &cmd, 1, 0) > 0) {
+		ESP_LOGI(TAG, "serial_receive: cmd > %i (%c)", cmd, cmd);
+		switch (cmd) {
+			case 27:	//ESC
+				esp_log_level_set(TAG, ESP_LOG_INFO);
+				break;
+			default:
+				serial_receive(cmd);
+		}
+		uart_flush_input(UART_NUM_0);
+	}
 }
+#define APP_SERIAL_LOOP		serial_loop()
 
 
-void analog_init()
+void serial_init()
 {
-	for (int ch=0; ch<8; ++ch)
-		ESP_ERROR_CHECK(adc1_config_channel_atten((adc1_channel_t)ch, ADC_ATTEN_DB_11));
-	ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
-	esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &analog_characteristics);
+	ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2*UART_FIFO_LEN, 0, 0, NULL, 0));
+	esp_vfs_dev_uart_use_driver(UART_NUM_0);
 }
-#define APP_ANALOG_INIT		analog_init()
-
-
-#endif //ANALOG_H_
+#define APP_SERIAL_INIT		serial_init()
