@@ -24,11 +24,7 @@ from shared import system
 parser = argparse.ArgumentParser()
 parser.add_argument("name", nargs='?', help="name of the esp32 project")
 parser.add_argument("--ip", help="ip address")
-parser.add_argument("--console", action="store_true", help="log also to console")
 args = parser.parse_args()
-
-if args.console:
-	logging.root.addHandler(logging.StreamHandler())
 
 
 def update():
@@ -42,10 +38,11 @@ def update():
 		'psk':		pathlib.Path('/etc/hostapd/hostapd.wpa_psk').read_text().strip().split()[1]
 	}
 	if args.ip:
+		ip = socket.gethostbyname('sys').rpartition('.')[0]+'.'+args.ip if args.ip.isdigit() else socket.gethostbyname(args.ip)
 		cfg['net'] = {
-			'ip':	socket.gethostbyname('sys').rpartition('.')[0] +'.'+ args.ip,
+			'ip':	ip,
 		}
-	
+
 	with tempfile.NamedTemporaryFile() as cfgFile:
 		cfgFile.write(json.dumps(cfg).encode() + b'\0')
 		cfgFile.flush()
@@ -57,7 +54,7 @@ def update():
 			'ota':  ('0x8d000', 'ota.bin'),
 			'app':  ('0x90000', 'app.bin'),
 		}
-		system.run(['esptool.py', 'write_flash', *flash['boot'], *flash['part'], *flash['cfg'], *flash['ota'], *flash['app']], stdout=(None if args.console else subprocess.PIPE))
+		system.run(['esptool.py', 'write_flash', *flash['boot'], *flash['part'], *flash['cfg'], *flash['ota'], *flash['app']], stdout=(None if logging.term else subprocess.PIPE))
 
 
 try:
