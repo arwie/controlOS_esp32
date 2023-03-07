@@ -18,6 +18,10 @@
 #include <functional>
 
 
+#define MS_MIN_TICKS(ms) ( 1 + (((ms) + ((portTICK_PERIOD_MS) - 1)) / (portTICK_PERIOD_MS)) )	//compute ticks to sleep at least ms milliseconds
+
+
+
 template<typename T> int sgn(T val) {
 	return (T(0) < val) - (val < T(0));
 }
