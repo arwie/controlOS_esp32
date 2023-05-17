@@ -17,8 +17,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-import logging, argparse, pathlib, json, tempfile, os, socket, subprocess
+import logging, argparse, json, tempfile, os, subprocess
+from pathlib import Path
+from socket import gethostbyname
 from shared import system
+from shared.conf import Conf
 
 
 parser = argparse.ArgumentParser()
@@ -29,16 +32,19 @@ args = parser.parse_args()
 
 def update():
 	os.chdir('/usr/lib/esp32/{}'.format(args.name))
+
+	flashconf = Conf('flash.conf')
 	
 	cfg = {
-		'ota': 'http://{}:8102/{}'.format(socket.gethostbyname('sys'), args.name)
+		'ota': 'http://{}:8102/{}'.format(gethostbyname('sys'), args.name)
 	}
-	cfg['wifi'] = {
-		'bssid':	[int(h,16) for h in pathlib.Path('/sys/class/net/syswlan/address').read_text().strip().split(':')],
-		'psk':		pathlib.Path('/etc/hostapd/hostapd.wpa_psk').read_text().strip().split()[1]
-	}
+	if flashconf.getboolean('net', 'wifi', fallback=True):
+		cfg['wifi'] = {
+			'bssid':	[int(h,16) for h in Path('/sys/class/net/syswlan/address').read_text().strip().split(':')],
+			'psk':		Path('/etc/hostapd/hostapd.wpa_psk').read_text().strip().split()[1]
+		}
 	if args.ip:
-		ip = socket.gethostbyname('sys').rpartition('.')[0]+'.'+args.ip if args.ip.isdigit() else socket.gethostbyname(args.ip)
+		ip = gethostbyname('sys').rpartition('.')[0]+'.'+args.ip if args.ip.isdigit() else gethostbyname(args.ip)
 		cfg['net'] = {
 			'ip':	ip,
 		}

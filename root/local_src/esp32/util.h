@@ -25,3 +25,16 @@
 template<typename T> int sgn(T val) {
 	return (T(0) < val) - (val < T(0));
 }
+
+
+#ifdef APP_NET_ETH
+
+#else //wifi
+
+int8_t wifi_signal() {
+	wifi_ap_record_t ap = {};
+	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_sta_get_ap_info(&ap));
+	return ap.rssi;
+}
+
+#endif //APP_NET_ETH

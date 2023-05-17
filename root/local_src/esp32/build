@@ -22,3 +22,5 @@ sha256sum app.elf  | cut -f 1 -d " " >		app.hash
 ln -f bootloader/bootloader.bin				boot.bin
 ln -f partition_table/partition-table.bin	part.bin
 ln -f ota_data_initial.bin					ota.bin
+
+cp $PROJECTDIR/flash.conf .

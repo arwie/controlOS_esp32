@@ -68,6 +68,7 @@ $(STATEDIR)/esp32.targetinstall:
 		@$(call install_copy, esp32, 0, 0, 0644, -, $(ESP32_INSTALL)/$(project)/ota.bin,  no); \
 		@$(call install_copy, esp32, 0, 0, 0644, -, $(ESP32_INSTALL)/$(project)/app.bin,  no); \
 		@$(call install_copy, esp32, 0, 0, 0644, -, $(ESP32_INSTALL)/$(project)/app.hash); \
+		@$(call install_copy, esp32, 0, 0, 0644, -, $(ESP32_INSTALL)/$(project)/flash.conf); \
 	)
 	
 	@$(call install_alternative, esp32, 0, 0, 0755, /usr/bin/esp32-update)
