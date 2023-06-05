@@ -15,6 +15,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+#include <driver/gpio.h>
+
 #include <functional>
 
 
@@ -24,6 +26,12 @@
 
 template<typename T> int sgn(T val) {
 	return (T(0) < val) - (val < T(0));
+}
+
+
+void gpio_init_pin_output(gpio_num_t gpio_num) {
+	gpio_reset_pin(gpio_num);
+	gpio_set_direction(gpio_num, GPIO_MODE_OUTPUT);
 }
 
 
