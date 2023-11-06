@@ -90,7 +90,7 @@ private:
 			} else {
 				if (slave->connected) {
 					slave->connected = false;
-					ESP_LOGI(TAG, "UdpSlave > disconnected");
+					ESP_LOGW(TAG, "UdpSlave > disconnected");
 					if(slave->onDisconnect)
 						slave->onDisconnect();
 				}
@@ -125,7 +125,6 @@ private:
 		auto len = serializeJson(msg, buffer, sizeof(buffer));
 		ESP_LOGI(TAG, "UdpSlave:send > %.*s", len,buffer);
 		
-		addr.sin_port = htons(port);
 		if (sendto(sock, buffer, len, 0, (struct sockaddr *)&addr, sizeof(addr)) < 0)
 			ESP_LOGE(TAG, "UdpSlave:send > errno %d", errno);
 	}
