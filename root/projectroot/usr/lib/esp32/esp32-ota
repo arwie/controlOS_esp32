@@ -17,28 +17,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-import shared, logging, pathlib, socket
-from http.server import BaseHTTPRequestHandler, HTTPStatus
+import pathlib, socket
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler
 from systemd import daemon
+from shared import log
 
 
 
 class updateHttpHandler(BaseHTTPRequestHandler):
 	def log_error(self, format, *args):
-		logging.error(format%args)
+		log.error(format%args)
 	def log_request(self, code='-', size='-'):
-		logging.info('HTTP request for: {} / response: {}'.format(self.name, code))
+		log.info(f'HTTP request for: {self.name} / response: {code}')
 	
 	def do_GET(self):
 		self.name    = self.path.strip('/')
 		project = pathlib.Path('/usr/lib/esp32', self.name)
 		
 		if not project.exists():
-			self.send_error(HTTPStatus.NOT_FOUND, message='esp32 project "{}" not found'.format(self.name))
+			self.send_error(HTTPStatus.NOT_FOUND, message='esp32 project "{self.name}" not found')
 			self.end_headers()
 			return
 		
-		if pathlib.Path(project, 'app.hash').read_text().startswith(self.headers.get('Hash')):
+		if pathlib.Path(project, 'app.hash').read_text().startswith(str(self.headers.get('Hash'))):
 			self.send_response(HTTPStatus.NOT_MODIFIED)
 			self.end_headers()
 			return
@@ -53,4 +55,4 @@ class updateHttpHandler(BaseHTTPRequestHandler):
 
 
 systemdSocket = socket.fromfd(daemon.LISTEN_FDS_START, socket.AF_INET6, socket.SOCK_STREAM)
-updateHttpHandler(systemdSocket, systemdSocket.getpeername(), None)
+updateHttpHandler(systemdSocket, systemdSocket.getpeername(), None) #type:ignore

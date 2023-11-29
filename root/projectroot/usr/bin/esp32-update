@@ -17,10 +17,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-import logging, argparse, json, tempfile, os, subprocess
+from typing import Any
+import argparse, json, tempfile, os, subprocess
 from pathlib import Path
 from socket import gethostbyname
-from shared import system
+from shared import log, system
 from shared.conf import Conf
 
 
@@ -30,43 +31,39 @@ parser.add_argument("--ip", help="ip address")
 args = parser.parse_args()
 
 
-def update():
-	os.chdir('/usr/lib/esp32/{}'.format(args.name))
+log.info(f'update esp32 project: {args.name}')
+os.chdir(f'/usr/lib/esp32/{args.name}')
 
-	flashconf = Conf('flash.conf')
-	
-	cfg = {
-		'ota': 'http://{}:8102/{}'.format(gethostbyname('sys'), args.name)
+flashconf = Conf('flash.conf')
+
+cfg:dict[str, Any] = {
+	'ota': f"http://{gethostbyname('sys')}:8102/{args.name}"
+}
+if flashconf.getboolean('net', 'wifi', fallback=True):
+	cfg['wifi'] = {
+		'bssid':	[int(h,16) for h in Path('/sys/class/net/syswlan/address').read_text().strip().split(':')],
+		'psk':		Path('/etc/hostapd/hostapd.wpa_psk').read_text().strip().split()[1]
 	}
-	if flashconf.getboolean('net', 'wifi', fallback=True):
-		cfg['wifi'] = {
-			'bssid':	[int(h,16) for h in Path('/sys/class/net/syswlan/address').read_text().strip().split(':')],
-			'psk':		Path('/etc/hostapd/hostapd.wpa_psk').read_text().strip().split()[1]
-		}
-	if args.ip:
-		ip = gethostbyname('sys').rpartition('.')[0]+'.'+args.ip if args.ip.isdigit() else gethostbyname(args.ip)
-		cfg['net'] = {
-			'ip':	ip,
-		}
+if args.ip:
+	ip = f"{gethostbyname('sys').rpartition('.')[0]}.{args.ip}" if args.ip.isdigit() else gethostbyname(args.ip)
+	cfg['net'] = {
+		'ip':	ip,
+	}
 
-	with tempfile.NamedTemporaryFile() as cfgFile:
-		cfgFile.write(json.dumps(cfg).encode() + b'\0')
-		cfgFile.flush()
-		
-		flash = {
-			'boot': ('0x1000',  'boot.bin'),
-			'part': ('0x8000',  'part.bin'),
-			'cfg':  ('0x89000',  cfgFile.name),
-			'ota':  ('0x8d000', 'ota.bin'),
-			'app':  ('0x90000', 'app.bin'),
-		}
-		system.run(['esptool.py', 'write_flash', *flash['boot'], *flash['part'], *flash['cfg'], *flash['ota'], *flash['app']], stdout=(None if logging.term else subprocess.PIPE))
+with tempfile.NamedTemporaryFile() as cfgFile:
+	cfgFile.write(json.dumps(cfg).encode() + b'\0')
+	cfgFile.flush()
+	
+	flash = {
+		'boot': ('0x1000',  'boot.bin'),
+		'part': ('0x8000',  'part.bin'),
+		'cfg':  ('0x89000',  cfgFile.name),
+		'ota':  ('0x8d000', 'ota.bin'),
+		'app':  ('0x90000', 'app.bin'),
+	}
+	system.run(
+		['esptool.py', 'write_flash', *flash['boot'], *flash['part'], *flash['cfg'], *flash['ota'], *flash['app']],
+		stdout=(None if log.term else subprocess.PIPE)
+	)
 
-
-try:
-	logging.info('update esp32 project: {}'.format(args.name))
-	update()
-	logging.info('esp32 updated successfully')
-except:
-	logging.exception('ERROR in esp32-update')
-	exit(1)
+log.info('esp32 updated successfully')
